@@ -8,7 +8,11 @@
 #include <map>
 using namespace std;
 
-typedef void * (*THREADFUNCPTR)(void *);
+enum class matrix_operations {
+    ADD,
+    SUBTRACT,
+    MULTIPLY
+};
 
 class matrix_wrapper {
     public:
@@ -90,24 +94,46 @@ class operation {
 
 };
 
-class add_operation {
+class matrix_operation_thread {
     public:
-        static void *execute(void *argsPtr) {
-            chrono::high_resolution_clock::time_point t1 = chrono::high_resolution_clock::now();
-            arguments* args = (arguments*) argsPtr;
-            int rowCount = args->m1.rowCount;
-            int colCount = args->m1.colCount;
-            double sum = args->getM1Val(args->targetRow, args->targetCol) + args->getM2Val(args->targetRow, args->targetCol);
-            args->updateResultMatrix(sum);
-            chrono::high_resolution_clock::time_point t2 = chrono::high_resolution_clock::now();
-            long runtime = chrono::duration_cast<chrono::nanoseconds>( t2 - t1 ).count();
-            args->recordRuntime(runtime);
+        arguments args;
+        matrix_operation_thread(arguments& args) : args(args) {}
+        bool start() {
+            return (pthread_create(&thread, NULL, executeOperation, this) == 0);
+        }
+        void waitForThreadToFinish() {
+            pthread_join(thread, NULL);
+        }
+        virtual void validate(matrix_wrapper& m1, matrix_wrapper& m2) = 0;
+    protected:
+        virtual void operation(arguments& args) = 0;
+    private:
+        pthread_t thread;
+        static void* executeOperation(void* obj) {
+            matrix_operation_thread* threadObj = (matrix_operation_thread *) obj;
+            threadObj->operation(threadObj->args);
             return NULL;
         }
+};
+
+class add_operation : public matrix_operation_thread {
+    public:
+        add_operation(arguments& args) : matrix_operation_thread(args) {}
         void validate(matrix_wrapper& m1, matrix_wrapper& m2) {
             if (m1.rowCount != m2.rowCount || m1.colCount != m2.colCount) {
                 throw invalid_argument("Matricies have invalid dimensions for addition!");
             }
+        }
+    protected:
+        void operation(arguments& args) {
+            chrono::high_resolution_clock::time_point t1 = chrono::high_resolution_clock::now();
+            int rowCount = args.m1.rowCount;
+            int colCount = args.m1.colCount;
+            double sum = args.getM1Val(args.targetRow, args.targetCol) + args.getM2Val(args.targetRow, args.targetCol);
+            args.updateResultMatrix(sum);
+            chrono::high_resolution_clock::time_point t2 = chrono::high_resolution_clock::now();
+            long runtime = chrono::duration_cast<chrono::nanoseconds>( t2 - t1 ).count();
+            args.recordRuntime(runtime);
         }
 };
 
@@ -336,7 +362,7 @@ operation_result subtract(matrix_wrapper& m1, matrix_wrapper& m2) {
     return operation_result(result, runtimes, numOfChildThreads);
 }
 
-operation_result calculate(matrix_wrapper& m1, matrix_wrapper& m2, void (*op)()) {
+operation_result calculate(matrix_wrapper& m1, matrix_wrapper& m2) {
     //op.validate(m1, m2);
     int resultRowCount = m1.colCount;
     int resultColCount = m2.rowCount;
@@ -350,7 +376,7 @@ operation_result calculate(matrix_wrapper& m1, matrix_wrapper& m2, void (*op)())
     for (int i = 0; i < m1.rowCount; i++) {
         for (int k = 0; k < m2.colCount; k++) {
             argArray[i][k] = arguments(m1, m2, i, k, result, runtimes, threadIndex);
-            if (pthread_create(&tid[threadIndex++], NULL, op, &argArray[i][k])) {
+            if (pthread_create(&tid[threadIndex++], NULL, addOp, &argArray[i][k])) {
                 cout << "Error creating thread" << endl;
             }
         }
@@ -367,7 +393,7 @@ operation_result calculate(matrix_wrapper& m1, matrix_wrapper& m2, void (*op)())
 
 int main() {
     vector<matrix_wrapper> matricies = createMatriciesFromFile();
-    operation_result result = calculate(matricies[0], matricies[1], addOp);
+    operation_result result = calculate(matricies[0], matricies[1]);
     result.printMatrix();
     result.printAvgRuntimePerThread();
     return 0;
