@@ -13,13 +13,33 @@ enum class matrix_operation {
     MULTIPLY
 };
 
+template <class T>
+T** initialize2DArray(int rows, int cols) {
+    T** matrix = new T*[rows];
+    for (int i = 0; i < rows; i++) {
+        matrix[i] = new T[cols];
+    }
+    return matrix;
+}
+
 class matrix_wrapper {
     public:
         int rowCount;
         int colCount;
         double** matrix;
         matrix_wrapper() {}
-        matrix_wrapper(int rowCount, int colCount, double** matrix) : rowCount(rowCount), colCount(colCount), matrix(matrix) {}
+        matrix_wrapper(int rowCount, int colCount) : rowCount(rowCount), colCount(colCount) {
+            matrix = initialize2DArray<double>(rowCount, colCount);
+        }
+        matrix_wrapper(matrix_wrapper& m1, matrix_wrapper& m2, matrix_operation opType) {
+            rowCount = m1.rowCount;
+            colCount = m1.colCount;
+            if (opType == matrix_operation::MULTIPLY) {
+                rowCount = m1.rowCount;
+                colCount = m2.colCount;
+            }
+            matrix = initialize2DArray<double>(rowCount, colCount);
+        }
         void print() {
             cout << "----- Result Matrix -----" << endl;
             for (int i = 0; i < rowCount; i++) {
@@ -87,23 +107,6 @@ class operation_result {
         }
 };
 
-matrix_wrapper initializeMatrix(int rows, int cols) {
-    double** matrix = new double*[rows];
-    for (int i = 0; i < rows; i++) {
-        matrix[i] = new double[cols];
-    }
-    matrix_wrapper result(rows, cols, matrix);
-    return result;
-}
-
-arguments** initializeArgsArray(int rows, int cols) {
-    arguments** args = new arguments*[rows];
-    for (int i = 0; i < rows; i++) {
-        args[i] = new arguments[cols];
-    }
-    return args;
-}
-
 vector<matrix_wrapper> createMatriciesFromFile() {
     vector<matrix_wrapper> matricies;
     ifstream infile("input.txt");
@@ -112,7 +115,7 @@ vector<matrix_wrapper> createMatriciesFromFile() {
     double element;
     while (infile >> rowNum) {
         infile >> colNum;
-        matrix_wrapper result = initializeMatrix(rowNum, colNum);
+        matrix_wrapper result(rowNum, colNum);
         for (int i = 0; i < rowNum; i++) {
             for (int k = 0; k < colNum; k++) {
                 infile >> element;
@@ -130,7 +133,7 @@ void *multiplyOp(void *argsPtr) {
     arguments* args = (arguments*) argsPtr;
     int m1ColIter = 0;
     int m2RowIter = 0;
-    int numOfIterations = args->m1.rowCount;
+    int numOfIterations = args->m1.colCount;
     double result = 0;
     for (int i = 0; i < numOfIterations; i++) {
         result += args->getM1Val(args->targetRow, m1ColIter) * args->getM2Val(m2RowIter, args->targetCol);
@@ -172,6 +175,7 @@ void validateMatricies(matrix_wrapper& m1, matrix_wrapper& m2, matrix_operation 
             if (m1.colCount != m2.rowCount) {
                 throw invalid_argument("Matricies have invalid dimensions for multiplication!");
             }
+            break;
         default:
             if (m1.rowCount != m2.rowCount || m1.colCount != m2.colCount) {
                 throw invalid_argument("Matricies have invalid dimensions for addition/subtraction!");
@@ -181,14 +185,12 @@ void validateMatricies(matrix_wrapper& m1, matrix_wrapper& m2, matrix_operation 
 
 operation_result calculate(matrix_wrapper& m1, matrix_wrapper& m2, matrix_operation opType) {
     validateMatricies(m1, m2, opType);
-    int resultRowCount = m1.colCount;
-    int resultColCount = m2.rowCount;
-    int numOfChildThreads = resultRowCount * resultColCount;
-    static matrix_wrapper result = initializeMatrix(resultRowCount, resultColCount);
+    static matrix_wrapper result = matrix_wrapper(m1, m2, opType);
+    int numOfChildThreads = result.rowCount * result.colCount;
     static long* runtimes = new long[numOfChildThreads];
     pthread_t tid[numOfChildThreads];
     int threadIndex = 0;
-    arguments** argArray = initializeArgsArray(resultRowCount, resultColCount);
+    arguments** argArray = initialize2DArray<arguments>(result.rowCount, result.colCount);
     for (int i = 0; i < m1.rowCount; i++) {
         for (int k = 0; k < m2.colCount; k++) {
             argArray[i][k] = arguments(m1, m2, i, k, result, runtimes, threadIndex);
@@ -226,28 +228,32 @@ int main() {
         cout << "Input: ";
         cin >> input;
         operation_result result;
-        switch (input) {
-            case 1:
-                cout << "----- ADDING MATRICIES -----" << endl;
-                result = calculate(matricies[0], matricies[1], matrix_operation::ADD);
-                break;
-            case 2:
-                cout << "----- SUBTRACTING MATRICIES -----" << endl;
-                result = calculate(matricies[0], matricies[1], matrix_operation::SUBTRACT);
-                break;
-            case 3:
-                cout << "----- MULTIPLYING MATRICIES -----" << endl;
-                result = calculate(matricies[0], matricies[1], matrix_operation::MULTIPLY);
-                break;
-            case 4:
-                cout << "----- Exiting -----" << endl;
-                continue;
-            default:
-                cout << "Invalid option" << endl;
-                continue;
+        try {
+            switch (input) {
+                case 1:
+                    cout << "----- ADDING MATRICIES -----" << endl;
+                    result = calculate(matricies[0], matricies[1], matrix_operation::ADD);
+                    break;
+                case 2:
+                    cout << "----- SUBTRACTING MATRICIES -----" << endl;
+                    result = calculate(matricies[0], matricies[1], matrix_operation::SUBTRACT);
+                    break;
+                case 3:
+                    cout << "----- MULTIPLYING MATRICIES -----" << endl;
+                    result = calculate(matricies[0], matricies[1], matrix_operation::MULTIPLY);
+                    break;
+                case 4:
+                    cout << "----- Exiting -----" << endl;
+                    continue;
+                default:
+                    cout << "Invalid option" << endl;
+                    continue;
+            }
+            result.printMatrix();
+            result.printAvgRuntimePerThread();
+        } catch (invalid_argument e) {
+            cout << e.what() << endl;
         }
-        result.printMatrix();
-        result.printAvgRuntimePerThread();
     }
     return 0;
 }
