@@ -109,7 +109,13 @@ class operation_result {
 
 vector<matrix_wrapper> createMatriciesFromFile() {
     vector<matrix_wrapper> matricies;
-    ifstream infile("input.txt");
+    string filename;
+    cout << "Enter full name and extension of input file: ";
+    cin >> filename;
+    ifstream infile(filename);
+    if (infile.fail()) {
+        throw invalid_argument("Could not open file - invalid file name");        
+    }
     int rowNum;
     int colNum;
     double element;
@@ -222,13 +228,13 @@ operation_result calculate(matrix_wrapper& m1, matrix_wrapper& m2, matrix_operat
 }
 
 int main() {
-    vector<matrix_wrapper> matricies = createMatriciesFromFile();
-    int input;
-    while (input != 4) {
-        cout << "Input: ";
-        cin >> input;
-        operation_result result;
-        try {
+    try {
+        vector<matrix_wrapper> matricies = createMatriciesFromFile();
+        int input;
+        while (input != 4) {
+            cout << "Input: ";
+            cin >> input;
+            operation_result result;
             switch (input) {
                 case 1:
                     cout << "----- ADDING MATRICIES -----" << endl;
@@ -251,9 +257,9 @@ int main() {
             }
             result.printMatrix();
             result.printAvgRuntimePerThread();
-        } catch (invalid_argument e) {
-            cout << e.what() << endl;
         }
+        return 0;
+    } catch (invalid_argument e) {
+        cout << e.what() << endl;
     }
-    return 0;
 }
