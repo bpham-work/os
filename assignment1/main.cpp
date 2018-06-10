@@ -8,7 +8,7 @@
 #include <map>
 using namespace std;
 
-enum class matrix_operations {
+enum class matrix_operation {
     ADD,
     SUBTRACT,
     MULTIPLY
@@ -87,104 +87,6 @@ class operation_result {
         }
 };
 
-class operation {
-    public:
-        virtual void *execute(void *argsPtr) = 0;
-        virtual void validate(matrix_wrapper& m1, matrix_wrapper& m2) = 0;
-
-};
-
-class matrix_operation_thread {
-    public:
-        arguments args;
-        matrix_operation_thread(arguments& args) : args(args) {}
-        bool start() {
-            return (pthread_create(&thread, NULL, executeOperation, this) == 0);
-        }
-        void waitForThreadToFinish() {
-            pthread_join(thread, NULL);
-        }
-        virtual void validate(matrix_wrapper& m1, matrix_wrapper& m2) = 0;
-    protected:
-        virtual void operation(arguments& args) = 0;
-    private:
-        pthread_t thread;
-        static void* executeOperation(void* obj) {
-            matrix_operation_thread* threadObj = (matrix_operation_thread *) obj;
-            threadObj->operation(threadObj->args);
-            return NULL;
-        }
-};
-
-class add_operation : public matrix_operation_thread {
-    public:
-        add_operation(arguments& args) : matrix_operation_thread(args) {}
-        void validate(matrix_wrapper& m1, matrix_wrapper& m2) {
-            if (m1.rowCount != m2.rowCount || m1.colCount != m2.colCount) {
-                throw invalid_argument("Matricies have invalid dimensions for addition!");
-            }
-        }
-    protected:
-        void operation(arguments& args) {
-            chrono::high_resolution_clock::time_point t1 = chrono::high_resolution_clock::now();
-            int rowCount = args.m1.rowCount;
-            int colCount = args.m1.colCount;
-            double sum = args.getM1Val(args.targetRow, args.targetCol) + args.getM2Val(args.targetRow, args.targetCol);
-            args.updateResultMatrix(sum);
-            chrono::high_resolution_clock::time_point t2 = chrono::high_resolution_clock::now();
-            long runtime = chrono::duration_cast<chrono::nanoseconds>( t2 - t1 ).count();
-            args.recordRuntime(runtime);
-        }
-};
-
-//class subtract_operation : public operation {
-//    public:
-//        void *execute(void *argsPtr) {
-//            chrono::high_resolution_clock::time_point t1 = chrono::high_resolution_clock::now();
-//            arguments* args = (arguments*) argsPtr;
-//            int rowCount = args->m1.rowCount;
-//            int colCount = args->m1.colCount;
-//            double difference = args->getM1Val(args->targetRow, args->targetCol) - args->getM2Val(args->targetRow, args->targetCol);
-//            args->updateResultMatrix(difference);
-//            chrono::high_resolution_clock::time_point t2 = chrono::high_resolution_clock::now();
-//            long runtime = chrono::duration_cast<chrono::nanoseconds>( t2 - t1 ).count();
-//            args->recordRuntime(runtime);
-//            return NULL;
-//        }
-//        void validate(matrix_wrapper& m1, matrix_wrapper& m2) {
-//            if (m1.rowCount != m2.rowCount || m1.colCount != m2.colCount) {
-//                throw invalid_argument("Matricies have invalid dimensions for subtraction!");
-//            }
-//        }
-//};
-//
-//class multiply_operation : public operation {
-//    public:
-//        void *execute(void *argsPtr) {
-//            chrono::high_resolution_clock::time_point t1 = chrono::high_resolution_clock::now();
-//            arguments* args = (arguments*) argsPtr;
-//            int m1ColIter = 0;
-//            int m2RowIter = 0;
-//            int numOfIterations = args->m1.rowCount;
-//            double result = 0;
-//            for (int i = 0; i < numOfIterations; i++) {
-//                result += args->getM1Val(args->targetRow, m1ColIter) * args->getM2Val(m2RowIter, args->targetCol);
-//                m1ColIter++;
-//                m2RowIter++;
-//            }
-//            args->updateResultMatrix(result);
-//            chrono::high_resolution_clock::time_point t2 = chrono::high_resolution_clock::now();
-//            long runtime = chrono::duration_cast<chrono::nanoseconds>( t2 - t1 ).count();
-//            args->recordRuntime(runtime);
-//            return NULL;
-//        }
-//        void validate(matrix_wrapper& m1, matrix_wrapper& m2) {
-//            if (m1.colCount != m2.rowCount) {
-//                throw invalid_argument("Matricies have invalid dimensions for multiplication!");
-//            }
-//        }
-//};
-
 matrix_wrapper initializeMatrix(int rows, int cols) {
     double** matrix = new double*[rows];
     for (int i = 0; i < rows; i++) {
@@ -245,8 +147,6 @@ void *multiplyOp(void *argsPtr) {
 void *addOp(void *argsPtr) {
     chrono::high_resolution_clock::time_point t1 = chrono::high_resolution_clock::now();
     arguments* args = (arguments*) argsPtr;
-    int rowCount = args->m1.rowCount;
-    int colCount = args->m1.colCount;
     double sum = args->getM1Val(args->targetRow, args->targetCol) + args->getM2Val(args->targetRow, args->targetCol);
     args->updateResultMatrix(sum);
     chrono::high_resolution_clock::time_point t2 = chrono::high_resolution_clock::now();
@@ -258,8 +158,6 @@ void *addOp(void *argsPtr) {
 void *subtractOp(void *argsPtr) {
     chrono::high_resolution_clock::time_point t1 = chrono::high_resolution_clock::now();
     arguments* args = (arguments*) argsPtr;
-    int rowCount = args->m1.rowCount;
-    int colCount = args->m1.colCount;
     double difference = args->getM1Val(args->targetRow, args->targetCol) - args->getM2Val(args->targetRow, args->targetCol);
     args->updateResultMatrix(difference);
     chrono::high_resolution_clock::time_point t2 = chrono::high_resolution_clock::now();
@@ -268,11 +166,21 @@ void *subtractOp(void *argsPtr) {
     return NULL;
 }
 
-
-operation_result multiply(matrix_wrapper& m1, matrix_wrapper& m2) {
-    if (m1.colCount != m2.rowCount) {
-        throw invalid_argument("Matricies have invalid dimensions for multiplication!");
+void validateMatricies(matrix_wrapper& m1, matrix_wrapper& m2, matrix_operation opType) {
+    switch (opType) {
+        case matrix_operation::MULTIPLY:
+            if (m1.colCount != m2.rowCount) {
+                throw invalid_argument("Matricies have invalid dimensions for multiplication!");
+            }
+        default:
+            if (m1.rowCount != m2.rowCount || m1.colCount != m2.colCount) {
+                throw invalid_argument("Matricies have invalid dimensions for addition/subtraction!");
+            }
     }
+}
+
+operation_result calculate(matrix_wrapper& m1, matrix_wrapper& m2, matrix_operation opType) {
+    validateMatricies(m1, m2, opType);
     int resultRowCount = m1.colCount;
     int resultColCount = m2.rowCount;
     int numOfChildThreads = resultRowCount * resultColCount;
@@ -285,98 +193,19 @@ operation_result multiply(matrix_wrapper& m1, matrix_wrapper& m2) {
     for (int i = 0; i < m1.rowCount; i++) {
         for (int k = 0; k < m2.colCount; k++) {
             argArray[i][k] = arguments(m1, m2, i, k, result, runtimes, threadIndex);
-            if (pthread_create(&tid[threadIndex++], NULL, multiplyOp, &argArray[i][k])) {
-                cout << "Error creating thread" << endl;
+            int threadCreateStatus;
+            switch (opType) {
+                case matrix_operation::ADD:
+                    threadCreateStatus = pthread_create(&tid[threadIndex++], NULL, addOp, &argArray[i][k]);
+                    break;
+                case matrix_operation::SUBTRACT:
+                    threadCreateStatus = pthread_create(&tid[threadIndex++], NULL, subtractOp, &argArray[i][k]);
+                    break;
+                case matrix_operation::MULTIPLY:
+                    threadCreateStatus = pthread_create(&tid[threadIndex++], NULL, multiplyOp, &argArray[i][k]);
+                    break;
             }
-        }
-    }
-    for (int i = 0; i < numOfChildThreads; i++) {
-        pthread_join(tid[i], NULL);
-    }
-    for (int i = 0; i < numOfChildThreads; i++) {
-        cout << "----- THREAD " << i << " TERMINATED -----" << endl;
-        pthread_join(tid[i], NULL);
-    }
-    return operation_result(result, runtimes, numOfChildThreads);
-}
-
-operation_result add(matrix_wrapper& m1, matrix_wrapper& m2) {
-    if (m1.rowCount != m2.rowCount || m1.colCount != m2.colCount) {
-        throw invalid_argument("Matricies have invalid dimensions for multiplication!");
-    }
-    int resultRowCount = m1.rowCount;
-    int resultColCount = m1.colCount;
-    int numOfChildThreads = resultRowCount * resultColCount;
-    static matrix_wrapper result = initializeMatrix(resultRowCount, resultColCount);
-    static map<int, long> runtime_map;
-    static long* runtimes = new long[numOfChildThreads];
-    pthread_t tid[numOfChildThreads];
-    int threadIndex = 0;
-    arguments** argArray = initializeArgsArray(resultRowCount, resultColCount);
-    for (int i = 0; i < m1.rowCount; i++) {
-        for (int k = 0; k < m2.colCount; k++) {
-            argArray[i][k] = arguments(m1, m2, i, k, result, runtimes, threadIndex);
-            if (pthread_create(&tid[threadIndex++], NULL, addOp, &argArray[i][k])) {
-                cout << "Error creating thread" << endl;
-            }
-        }
-    }
-    for (int i = 0; i < numOfChildThreads; i++) {
-        pthread_join(tid[i], NULL);
-    }
-    for (int i = 0; i < numOfChildThreads; i++) {
-        cout << "----- THREAD " << i << " TERMINATED -----" << endl;
-        pthread_join(tid[i], NULL);
-    }
-    return operation_result(result, runtimes, numOfChildThreads);
-}
-
-operation_result subtract(matrix_wrapper& m1, matrix_wrapper& m2) {
-    if (m1.rowCount != m2.rowCount || m1.colCount != m2.colCount) {
-        throw invalid_argument("Matricies have invalid dimensions for multiplication!");
-    }
-    int resultRowCount = m1.rowCount;
-    int resultColCount = m1.colCount;
-    int numOfChildThreads = resultRowCount * resultColCount;
-    static matrix_wrapper result = initializeMatrix(resultRowCount, resultColCount);
-    static map<int, long> runtime_map;
-    static long* runtimes = new long[numOfChildThreads];
-    pthread_t tid[numOfChildThreads];
-    int threadIndex = 0;
-    arguments** argArray = initializeArgsArray(resultRowCount, resultColCount);
-    for (int i = 0; i < m1.rowCount; i++) {
-        for (int k = 0; k < m2.colCount; k++) {
-            argArray[i][k] = arguments(m1, m2, i, k, result, runtimes, threadIndex);
-            if (pthread_create(&tid[threadIndex++], NULL, subtractOp, &argArray[i][k])) {
-                cout << "Error creating thread" << endl;
-            }
-        }
-    }
-    for (int i = 0; i < numOfChildThreads; i++) {
-        pthread_join(tid[i], NULL);
-    }
-    for (int i = 0; i < numOfChildThreads; i++) {
-        cout << "----- THREAD " << i << " TERMINATED -----" << endl;
-        pthread_join(tid[i], NULL);
-    }
-    return operation_result(result, runtimes, numOfChildThreads);
-}
-
-operation_result calculate(matrix_wrapper& m1, matrix_wrapper& m2) {
-    //op.validate(m1, m2);
-    int resultRowCount = m1.colCount;
-    int resultColCount = m2.rowCount;
-    int numOfChildThreads = resultRowCount * resultColCount;
-    static matrix_wrapper result = initializeMatrix(resultRowCount, resultColCount);
-    static map<int, long> runtime_map;
-    static long* runtimes = new long[numOfChildThreads];
-    pthread_t tid[numOfChildThreads];
-    int threadIndex = 0;
-    arguments** argArray = initializeArgsArray(resultRowCount, resultColCount);
-    for (int i = 0; i < m1.rowCount; i++) {
-        for (int k = 0; k < m2.colCount; k++) {
-            argArray[i][k] = arguments(m1, m2, i, k, result, runtimes, threadIndex);
-            if (pthread_create(&tid[threadIndex++], NULL, addOp, &argArray[i][k])) {
+            if (threadCreateStatus) {
                 cout << "Error creating thread" << endl;
             }
         }
@@ -393,7 +222,7 @@ operation_result calculate(matrix_wrapper& m1, matrix_wrapper& m2) {
 
 int main() {
     vector<matrix_wrapper> matricies = createMatriciesFromFile();
-    operation_result result = calculate(matricies[0], matricies[1]);
+    operation_result result = calculate(matricies[0], matricies[1], matrix_operation::ADD);
     result.printMatrix();
     result.printAvgRuntimePerThread();
     return 0;
