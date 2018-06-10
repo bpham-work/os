@@ -5,7 +5,6 @@
 #include <vector>
 #include <stdexcept>
 #include <chrono>
-#include <map>
 using namespace std;
 
 enum class matrix_operation {
@@ -69,6 +68,7 @@ class operation_result {
         matrix_wrapper resultMatrix;
         long* runtimes;
         int numOfElems;
+        operation_result() {}
         operation_result(matrix_wrapper& resultMatrix, long* runtimes, int numOfElems) :
             resultMatrix(resultMatrix), runtimes(runtimes), numOfElems(numOfElems) {}
         void printMatrix() { resultMatrix.print(); }
@@ -185,7 +185,6 @@ operation_result calculate(matrix_wrapper& m1, matrix_wrapper& m2, matrix_operat
     int resultColCount = m2.rowCount;
     int numOfChildThreads = resultRowCount * resultColCount;
     static matrix_wrapper result = initializeMatrix(resultRowCount, resultColCount);
-    static map<int, long> runtime_map;
     static long* runtimes = new long[numOfChildThreads];
     pthread_t tid[numOfChildThreads];
     int threadIndex = 0;
@@ -222,8 +221,33 @@ operation_result calculate(matrix_wrapper& m1, matrix_wrapper& m2, matrix_operat
 
 int main() {
     vector<matrix_wrapper> matricies = createMatriciesFromFile();
-    operation_result result = calculate(matricies[0], matricies[1], matrix_operation::ADD);
-    result.printMatrix();
-    result.printAvgRuntimePerThread();
+    int input;
+    while (input != 4) {
+        cout << "Input: ";
+        cin >> input;
+        operation_result result;
+        switch (input) {
+            case 1:
+                cout << "----- ADDING MATRICIES -----" << endl;
+                result = calculate(matricies[0], matricies[1], matrix_operation::ADD);
+                break;
+            case 2:
+                cout << "----- SUBTRACTING MATRICIES -----" << endl;
+                result = calculate(matricies[0], matricies[1], matrix_operation::SUBTRACT);
+                break;
+            case 3:
+                cout << "----- MULTIPLYING MATRICIES -----" << endl;
+                result = calculate(matricies[0], matricies[1], matrix_operation::MULTIPLY);
+                break;
+            case 4:
+                cout << "----- Exiting -----" << endl;
+                continue;
+            default:
+                cout << "Invalid option" << endl;
+                continue;
+        }
+        result.printMatrix();
+        result.printAvgRuntimePerThread();
+    }
     return 0;
 }
