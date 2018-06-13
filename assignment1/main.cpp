@@ -221,7 +221,6 @@ operation_result calculate(matrix_wrapper& m1, matrix_wrapper& m2, matrix_operat
     }
     for (int i = 0; i < numOfChildThreads; i++) {
         cout << "----- THREAD " << i << " TERMINATED -----" << endl;
-        pthread_join(tid[i], NULL);
     }
     return operation_result(result, runtimes, numOfChildThreads);
 }
