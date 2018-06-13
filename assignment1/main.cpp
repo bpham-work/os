@@ -26,7 +26,7 @@ class matrix_wrapper {
     public:
         int rowCount;
         int colCount;
-        double** matrix;
+        double** matrix = nullptr;
         matrix_wrapper() {}
         matrix_wrapper(int rowCount, int colCount) : rowCount(rowCount), colCount(colCount) {
             matrix = initialize2DArray<double>(rowCount, colCount);
@@ -222,6 +222,7 @@ operation_result calculate(matrix_wrapper& m1, matrix_wrapper& m2, matrix_operat
     for (int i = 0; i < numOfChildThreads; i++) {
         cout << "----- THREAD " << i << " TERMINATED -----" << endl;
     }
+    delete [] argArray;
     return operation_result(result, runtimes, numOfChildThreads);
 }
 
@@ -241,29 +242,33 @@ int main() {
             cout << "Input: ";
             cin >> input;
             operation_result result;
-            switch (input) {
-                case 1:
-                    cout << "----- ADDING MATRICIES -----" << endl;
-                    result = calculate(matricies[0], matricies[1], matrix_operation::ADD);
-                    break;
-                case 2:
-                    cout << "----- SUBTRACTING MATRICIES -----" << endl;
-                    result = calculate(matricies[0], matricies[1], matrix_operation::SUBTRACT);
-                    break;
-                case 3:
-                    cout << "----- MULTIPLYING MATRICIES -----" << endl;
-                    result = calculate(matricies[0], matricies[1], matrix_operation::MULTIPLY);
-                    break;
-                case 4:
-                    cout << "----- Exiting -----" << endl;
-                    continue;
-                default:
-                    cout << "Invalid option" << endl;
-                    continue;
+            try {
+                switch (input) {
+                    case 1:
+                        cout << "----- ADDING MATRICIES -----" << endl;
+                        result = calculate(matricies[0], matricies[1], matrix_operation::ADD);
+                        break;
+                    case 2:
+                        cout << "----- SUBTRACTING MATRICIES -----" << endl;
+                        result = calculate(matricies[0], matricies[1], matrix_operation::SUBTRACT);
+                        break;
+                    case 3:
+                        cout << "----- MULTIPLYING MATRICIES -----" << endl;
+                        result = calculate(matricies[0], matricies[1], matrix_operation::MULTIPLY);
+                        break;
+                    case 4:
+                        cout << "----- Exiting -----" << endl;
+                        continue;
+                    default:
+                        cout << "Invalid option" << endl;
+                        continue;
+                }
+                cout << "----- Result Matrix -----" << endl;
+                result.printMatrix();
+                result.printAvgRuntimePerThread();
+            } catch (invalid_argument e) {
+                cout << e.what() << endl;
             }
-            cout << "----- Result Matrix -----" << endl;
-            result.printMatrix();
-            result.printAvgRuntimePerThread();
         }
         return 0;
     } catch (invalid_argument e) {
