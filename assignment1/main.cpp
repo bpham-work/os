@@ -41,7 +41,6 @@ class matrix_wrapper {
             matrix = initialize2DArray<double>(rowCount, colCount);
         }
         void print() {
-            cout << "----- Result Matrix -----" << endl;
             for (int i = 0; i < rowCount; i++) {
                 for (int k = 0; k < colCount; k++) {
                     cout << matrix[i][k] << "\t";
@@ -231,7 +230,15 @@ int main() {
     try {
         vector<matrix_wrapper> matricies = createMatriciesFromFile();
         int input;
+        cout << "Matrix 1" << endl;
+        matricies[0].print();
+        cout << "Matrix 2" << endl;
+        matricies[1].print();
         while (input != 4) {
+            cout << "1. Add Matricies" << endl;
+            cout << "2. Subtract Matricies" << endl;
+            cout << "3. Multiply Matricies" << endl;
+            cout << "4. Exit" << endl;
             cout << "Input: ";
             cin >> input;
             operation_result result;
@@ -255,6 +262,7 @@ int main() {
                     cout << "Invalid option" << endl;
                     continue;
             }
+            cout << "----- Result Matrix -----" << endl;
             result.printMatrix();
             result.printAvgRuntimePerThread();
         }
