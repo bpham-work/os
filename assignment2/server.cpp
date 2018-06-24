@@ -10,7 +10,7 @@
 #include <string>
 #include <unordered_map>
 #include <stdexcept>
-#include "request.h" 
+#include "request.h"
 
 void error(char *msg) {
     perror(msg);
@@ -122,7 +122,7 @@ int main(int argc, char *argv[]) {
                     if (rwBytes < 0) {
                         error("ERROR writing to socket");
                     }
-                    if (req.requestType == 4) {
+                    if (req.requestType == 4 || strcmp(response, "LOGIN_FAILED") == 0) {
                         exit(0);
                     }
                 }

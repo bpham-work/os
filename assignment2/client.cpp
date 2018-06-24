@@ -64,15 +64,14 @@ int login(int& sockfd) {
     char buffer[256];
     bzero(buffer, 256);
     int acctNum;
-    char* SUCCESS_RESPONSE = "LOGIN_SUCCESS";
-    while (!loginSuccess) {
-        printf("Enter account number: ");
-        fgets(buffer, 256, stdin);
-        sscanf(buffer, "%d", &acctNum); // convert account number to int
-        request loginRequest {0, acctNum, 0};
-        char* loginResponse = sendRequest(sockfd, loginRequest);
-        printf("%s\n", loginResponse);
-        loginSuccess = strcmp(SUCCESS_RESPONSE, loginResponse) == 0;
+    printf("Enter account number: ");
+    fgets(buffer, 256, stdin);
+    sscanf(buffer, "%d", &acctNum); // convert account number to int
+    request loginRequest {0, acctNum, 0};
+    char* loginResponse = sendRequest(sockfd, loginRequest);
+    printf("%s\n", loginResponse);
+    if (strcmp("LOGIN_SUCCESS", loginResponse) != 0) {
+        exit(0);
     }
     return acctNum;
 }
