@@ -32,22 +32,30 @@ char* sendRequest(int& sockfd, request& req) {
 request buildRequest(int& requestType, int& acctNum) {
     char buffer[100];
     bzero(buffer, 100);
-    request req {requestType, acctNum};
-    int amt;
+    double amt = 0;
+    request req {requestType, acctNum, amt};
     switch (requestType) {
         case 2:
-            printf("Enter amount to deposit: ");
-            fgets(buffer, 256, stdin);
-            sscanf(buffer, "%d", &amt);
-            req.amt = amt;
+            while (amt <= 0) {
+                printf("Enter amount to deposit: ");
+                fgets(buffer, 256, stdin);
+                sscanf(buffer, "%lf", &amt);
+                req.amt = amt;
+                if (amt <= 0) {
+                    printf("Enter amount greater than 0\n");
+                }
+            }
             break;
         case 3:
-            printf("Enter amount to withdraw: ");
-            fgets(buffer, 256, stdin);
-            sscanf(buffer, "%d", &amt);
-            req.amt = amt;
-            break;
-        case 4:
+            while (amt <= 0) {
+                printf("Enter amount to withdraw: ");
+                fgets(buffer, 256, stdin);
+                sscanf(buffer, "%lf", &amt);
+                req.amt = amt;
+                if (amt <= 0) {
+                    printf("Enter amount greater than 0\n");
+                }
+            }
             break;
     }
     return req;
@@ -121,9 +129,10 @@ int main(int argc, char *argv[]) {
             char* response = sendRequest(sockfd, req);
             if (req.requestType == 4) {
                 printf("Disconnecting session\n");
+                shutdown(sockfd, SHUT_RDWR);
                 exit(0);
             }
-            printf("%s", response);
+            printf("%s\n", response);
         }
     }
     return 0;

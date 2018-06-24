@@ -37,7 +37,7 @@ std::unordered_map<std::string, double> readAccounts(std::string filename) {
 char* processRequest(std::unordered_map<std::string, double>& accounts, request& req) {
     char response[100];
     std::string acctNum = std::to_string(req.acctNum);
-    double origAmt;
+    double oldBal;
     double newBal;
     switch (req.requestType) {
         case 0:
@@ -49,20 +49,20 @@ char* processRequest(std::unordered_map<std::string, double>& accounts, request&
             }
             break;
         case 1:
-            sprintf(response, "Account number: %s\nBalance: $%f\n", acctNum.c_str(), accounts[acctNum]);
+            sprintf(response, "Account number: %s Balance: $%f", acctNum.c_str(), accounts[acctNum]);
             break;
         case 2:
-            origAmt = accounts[acctNum];
+            oldBal = accounts[acctNum];
             newBal = accounts[acctNum] + req.amt;
             accounts[acctNum] = newBal;
-            sprintf(response, "Account number: %s\nNew Balance: $%f\n", acctNum.c_str(), newBal);
+            sprintf(response, "Old Balance: $%f New Balance: $%f", oldBal, newBal);
             break;
         case 3:
             if (req.amt <= accounts[acctNum]) {
-                origAmt = accounts[acctNum];
+                oldBal = accounts[acctNum];
                 newBal = accounts[acctNum] - req.amt;
                 accounts[acctNum] = newBal;
-                sprintf(response, "Account number: %s\nNew Balance: $%f\n", acctNum.c_str(), newBal);
+                sprintf(response, "Old Balance: $%f New Balance: $%f", oldBal, newBal);
             } else {
                 sprintf(response, "Insufficient funds!\n");
             }
@@ -122,6 +122,7 @@ int main(int argc, char *argv[]) {
                         error("ERROR writing to socket");
                     }
                     if (req.requestType == 4 || strcmp(response, "LOGIN_FAILED") == 0) {
+                        shutdown(newsockfd, SHUT_RDWR);
                         exit(0);
                     }
                 }
