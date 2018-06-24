@@ -1,5 +1,3 @@
-// Please note this is a C program
-// It compiles without warnings with gcc
 #include <unistd.h>
 #include <stdio.h>
 #include <string.h>
@@ -57,7 +55,7 @@ request buildRequest(int& requestType, int& acctNum) {
 
 /**
  * Prompts user to login via account number
- * @returns Account number if successful login. -1 if unsuccessful login
+ * @return Account number if successful login. -1 if unsuccessful login
  */
 int login(int& sockfd) {
     bool loginSuccess = false;

@@ -76,7 +76,6 @@ char* processRequest(std::unordered_map<std::string, double>& accounts, request&
 
 int main(int argc, char *argv[]) {
     int sockfd, newsockfd, portno, clilen;
-    char buffer[256];
     struct sockaddr_in serv_addr, cli_addr;
     if (argc < 3) {
         fprintf(stderr,"ERROR - usage: %s [port] [inputFilename]\n", argv[0]);
