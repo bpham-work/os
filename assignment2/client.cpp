@@ -15,7 +15,7 @@ void error(char *msg) {
 }
 
 char* sendRequest(int& sockfd, request& req) {
-    char response[100];
+    char* response = new char[100];
     int result;
     result = write(sockfd, &req, sizeof(req));
     if (result < 0) { 
@@ -79,6 +79,7 @@ int login(int& sockfd) {
     if (strcmp("LOGIN_SUCCESS", loginResponse) != 0) {
         exit(0);
     }
+    delete loginResponse;
     return acctNum;
 }
 
@@ -133,6 +134,7 @@ int main(int argc, char *argv[]) {
                 exit(0);
             }
             printf("%s\n", response);
+	    delete response;
         }
     }
     return 0;

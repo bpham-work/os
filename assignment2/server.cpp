@@ -35,7 +35,7 @@ std::unordered_map<std::string, double> readAccounts(std::string filename) {
 }
 
 char* processRequest(std::unordered_map<std::string, double>& accounts, request& req) {
-    char response[100];
+    char* response = new char[100];;
     std::string acctNum = std::to_string(req.acctNum);
     double oldBal;
     double newBal;
@@ -118,6 +118,7 @@ int main(int argc, char *argv[]) {
                 } else if (rwBytes > 0) {
                     char* response = processRequest(accounts, req);
                     rwBytes = write(newsockfd, response, 100);
+		    delete response;
                     if (rwBytes < 0) {
                         error("ERROR writing to socket");
                     }
