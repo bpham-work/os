@@ -11,6 +11,7 @@
 #include <unordered_map>
 #include <stdexcept>
 #include <vector>
+#include <iostream>
 #include <sys/shm.h>
 #include "request.h"
 
@@ -47,15 +48,14 @@ std::vector<account> readAccounts(std::string filename) {
     return accounts;
 }
 
-char* processRequest(std::unordered_map<std::string, int> acctIndicies, account* accts, request& req) {
+char* processRequest(std::unordered_map<std::string, int> indicies, account* accts, request& req) {
     char* response = new char[100];;
     std::string acctNum = std::to_string(req.acctNum);
     double oldBal;
     double newBal;
-    int index = acctIndicies[acctNum];
     switch (req.requestType) {
         case 0:
-            if (acctIndicies.find(acctNum) != acctIndicies.end()) {
+            if (indicies.find(acctNum) != indicies.end()) {
                 printf("Connecting account %d\n", req.acctNum);
                 sprintf(response, "LOGIN_SUCCESS");
             } else {
@@ -63,19 +63,19 @@ char* processRequest(std::unordered_map<std::string, int> acctIndicies, account*
             }
             break;
         case 1:
-            sprintf(response, "Account number: %s Balance: $%f", acctNum.c_str(), accts[index].bal);
+            sprintf(response, "Account number: %s Balance: $%f", acctNum.c_str(), accts[indicies[acctNum]].bal);
             break;
         case 2:
-            oldBal = accts[index].bal;
-            accts[index].deposit(req.amt);
-            newBal = accts[index].bal; 
+            oldBal = accts[indicies[acctNum]].bal;
+            accts[indicies[acctNum]].deposit(req.amt);
+            newBal = accts[indicies[acctNum]].bal; 
             sprintf(response, "Old Balance: $%f New Balance: $%f", oldBal, newBal);
             break;
         case 3:
-            if (req.amt <= accts[index].bal) {
-                oldBal = accts[index].bal;
-                accts[index].withdraw(req.amt);
-                newBal = accts[index].bal; 
+            if (req.amt <= accts[indicies[acctNum]].bal) {
+                oldBal = accts[indicies[acctNum]].bal;
+                accts[indicies[acctNum]].withdraw(req.amt);
+                newBal = accts[indicies[acctNum]].bal; 
                 sprintf(response, "Old Balance: $%f New Balance: $%f", oldBal, newBal);
             } else {
                 sprintf(response, "Insufficient funds!\n");
@@ -114,13 +114,13 @@ int main(int argc, char *argv[]) {
     }
     clilen = sizeof(cli_addr);
 
-    std::unordered_map<std::string, int> acctIndicies;
+    std::unordered_map<std::string, int> indicies;
     std::vector<account> acctVector = readAccounts(argv[2]);
     key_t key = 6428;
 	int shmid = shmget(key, sizeof(account) * acctVector.size(), IPC_CREAT | 0666);
 	account* shared_mem_accts = (account*) shmat(shmid, 0, 0);
     for (int i = 0; i < acctVector.size(); i++) {
-        acctIndicies[acctVector[i].acctNum] = i;
+        indicies[acctVector[i].acctNum] = i;
         shared_mem_accts[i] = acctVector[i];
     }
 
@@ -139,7 +139,7 @@ int main(int argc, char *argv[]) {
                 if (rwBytes < 0) {
                     error("ERROR reading from socket");
                 } else if (rwBytes > 0) {
-                    char* response = processRequest(acctIndicies, shared_mem_accts, req);
+                    char* response = processRequest(indicies, shared_mem_accts, req);
                     rwBytes = write(newsockfd, response, 100);
 		    delete response;
                     if (rwBytes < 0) {
