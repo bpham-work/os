@@ -119,6 +119,7 @@ int main(int argc, char *argv[]) {
     key_t key = 6428;
 	int shmid = shmget(key, sizeof(account) * acctVector.size(), IPC_CREAT | 0666);
 	account* shared_mem_accts = (account*) shmat(shmid, 0, 0);
+    shmctl(shmid, IPC_RMID, NULL); // Mark shared memory segment to be deleted after last process detaches
     for (int i = 0; i < acctVector.size(); i++) {
         indicies[acctVector[i].acctNum] = i;
         shared_mem_accts[i] = acctVector[i];
