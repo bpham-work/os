@@ -10,6 +10,8 @@
 #include <string>
 #include <unordered_map>
 #include <stdexcept>
+#include <vector>
+#include <sys/shm.h>
 #include "request.h"
 
 void error(char *msg) {
@@ -17,31 +19,43 @@ void error(char *msg) {
     exit(1);
 }
 
-std::unordered_map<std::string, double> readAccounts(std::string filename) {
+class account {
+    public:
+        std::string acctNum;
+        double bal;
+        account() {}
+        account(std::string acctNum, double bal) : acctNum(acctNum), bal(bal) {} 
+        void deposit(int amt) { bal += amt; }
+        void withdraw(int amt) { bal -= amt; }
+};
+
+std::vector<account> readAccounts(std::string filename) {
     std::ifstream infile(filename);
     if (infile.fail())
         throw std::invalid_argument("Could not open file - invalid file name");
     std::string record;
-    std::unordered_map<std::string, double> accounts;
+    std::vector<account> accounts;
     while (getline(infile, record)) {
         int firstSpace = record.find(" ");
         int secondSpace = record.find(" ", firstSpace + 1);
         std::string acctNum = record.substr(0, firstSpace);
         std::string acctBal = record.substr(firstSpace + 1, secondSpace - firstSpace - 1);
-        accounts[acctNum] = std::stod(acctBal);
+        accounts.push_back(account(acctNum, std::stod(acctBal)));
     }
     infile.close();
+
     return accounts;
 }
 
-char* processRequest(std::unordered_map<std::string, double>& accounts, request& req) {
+char* processRequest(std::unordered_map<std::string, int> acctIndicies, account* accts, request& req) {
     char* response = new char[100];;
     std::string acctNum = std::to_string(req.acctNum);
     double oldBal;
     double newBal;
+    int index = acctIndicies[acctNum];
     switch (req.requestType) {
         case 0:
-            if (accounts.find(acctNum) != accounts.end()) {
+            if (acctIndicies.find(acctNum) != acctIndicies.end()) {
                 printf("Connecting account %d\n", req.acctNum);
                 sprintf(response, "LOGIN_SUCCESS");
             } else {
@@ -49,19 +63,19 @@ char* processRequest(std::unordered_map<std::string, double>& accounts, request&
             }
             break;
         case 1:
-            sprintf(response, "Account number: %s Balance: $%f", acctNum.c_str(), accounts[acctNum]);
+            sprintf(response, "Account number: %s Balance: $%f", acctNum.c_str(), accts[index].bal);
             break;
         case 2:
-            oldBal = accounts[acctNum];
-            newBal = accounts[acctNum] + req.amt;
-            accounts[acctNum] = newBal;
+            oldBal = accts[index].bal;
+            accts[index].deposit(req.amt);
+            newBal = accts[index].bal; 
             sprintf(response, "Old Balance: $%f New Balance: $%f", oldBal, newBal);
             break;
         case 3:
-            if (req.amt <= accounts[acctNum]) {
-                oldBal = accounts[acctNum];
-                newBal = accounts[acctNum] - req.amt;
-                accounts[acctNum] = newBal;
+            if (req.amt <= accts[index].bal) {
+                oldBal = accts[index].bal;
+                accts[index].withdraw(req.amt);
+                newBal = accts[index].bal; 
                 sprintf(response, "Old Balance: $%f New Balance: $%f", oldBal, newBal);
             } else {
                 sprintf(response, "Insufficient funds!\n");
@@ -81,7 +95,6 @@ int main(int argc, char *argv[]) {
         fprintf(stderr,"ERROR - usage: %s [port] [inputFilename]\n", argv[0]);
         exit(1);
     }
-    std::unordered_map<std::string, double> accounts = readAccounts(argv[2]);
     sockfd = socket(AF_INET, SOCK_STREAM, 0);
     if (sockfd < 0) { 
         error("ERROR opening socket");
@@ -101,6 +114,16 @@ int main(int argc, char *argv[]) {
     }
     clilen = sizeof(cli_addr);
 
+    std::unordered_map<std::string, int> acctIndicies;
+    std::vector<account> acctVector = readAccounts(argv[2]);
+    key_t key = 6428;
+	int shmid = shmget(key, sizeof(account) * acctVector.size(), IPC_CREAT | 0666);
+	account* shared_mem_accts = (account*) shmat(shmid, 0, 0);
+    for (int i = 0; i < acctVector.size(); i++) {
+        acctIndicies[acctVector[i].acctNum] = i;
+        shared_mem_accts[i] = acctVector[i];
+    }
+
     pid_t pid;
     request req;
     while (true) {
@@ -116,7 +139,7 @@ int main(int argc, char *argv[]) {
                 if (rwBytes < 0) {
                     error("ERROR reading from socket");
                 } else if (rwBytes > 0) {
-                    char* response = processRequest(accounts, req);
+                    char* response = processRequest(acctIndicies, shared_mem_accts, req);
                     rwBytes = write(newsockfd, response, 100);
 		    delete response;
                     if (rwBytes < 0) {
