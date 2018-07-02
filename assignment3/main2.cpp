@@ -50,34 +50,38 @@ int main(int argc, char* argv[]) {
     int status = 0;
     int semValue;
 
+    // Allocate shared memory
     key_t key = 6428;
     int shmid = shmget(key, sizeof(int) * 3, IPC_CREAT | 0666);
     int* totalServiced = (int*) shmat(shmid, NULL, 0);
     int* numWaited = totalServiced + 1;
     int* numNotWaited = numWaited + 1;
     shmctl(shmid, IPC_RMID, NULL);
+
     for (int i = 0; i < customers.size(); i++) {
-        sleep(customers[i].timeLastArrival);
+        if (customers[i].timeLastArrival > 0) {
+            sleep(customers[i].timeLastArrival);
+        }
         clerkSem = sem_open("clerks", O_CREAT);
         if ((pid = fork()) == 0) {
             printf("%s arriving\n", customers[i].name.c_str());
             
-	    // Record service data
-	    sem_wait(serviceDataSem);
-	    if (sem_getvalue(clerkSem, &semValue)) {
+            // Record service data
+            sem_wait(serviceDataSem);
+            if (sem_getvalue(clerkSem, &semValue)) {
                 perror("getval");
                 return 1;
             }
-	    (*totalServiced)++;
-	    if (semValue > 0) {
-		(*numNotWaited)++;
-	    } else {
-		(*numWaited)++;
-	    }
+            (*totalServiced)++;
+            if (semValue > 0) {
+                (*numNotWaited)++;
+            } else {
+                (*numWaited)++;
+            }
             //printf("semValue: %d\n", semValue);
-	    sem_post(serviceDataSem);
+            sem_post(serviceDataSem);
 
-	    // Serve customer
+            // Serve customer
             sem_wait(clerkSem);
             printf("%s getting helped\n", customers[i].name.c_str());
             if (customers[i].serviceTime > 0) {
@@ -92,11 +96,11 @@ int main(int argc, char* argv[]) {
     if (pid != 0) {
         while ((pid = wait(&status)) > 0);
 
-	printf("Total customers serviced: %d\n", *totalServiced);
-	printf("Number of customers with no wait: %d\n", *numNotWaited);
-	printf("Number of customers required to wait: %d\n", *numWaited);
+        printf("Total customers serviced: %d\n", *totalServiced);
+        printf("Number of customers with no wait: %d\n", *numNotWaited);
+        printf("Number of customers required to wait: %d\n", *numWaited);
 
-	// Close semaphores and shared memory
+        // Close semaphores and shared memory
         shmdt(totalServiced);
         sem_unlink("clerks");
         sem_close(clerkSem);
