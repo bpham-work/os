@@ -44,51 +44,57 @@ int main(int argc, char* argv[]) {
     int numOfClerks = atoi(argv[1]);
     std::string filename = argv[2];
     vector<customer> customers = getCustomers(filename); 
-    sem_t *clerkSem = sem_open("clerks", O_CREAT, 0600, numOfClerks);
-    sem_t *serviceDataSem = sem_open("serviceData", O_CREAT, 0600, 1);
+    sem_t *clerksSem = sem_open("clerksSem", O_CREAT, 0600, numOfClerks);
+    sem_t *serviceDataMutex = sem_open("serviceDataMutex", O_CREAT, 0600, 1);
+    sem_t *mutexSem = sem_open("mutexSem", O_CREAT, 0600, 1);
     pid_t pid;
     int status = 0;
-    int semValue;
 
     // Allocate shared memory
     key_t key = 6428;
-    int shmid = shmget(key, sizeof(int) * 3, IPC_CREAT | 0666);
+    int shmid = shmget(key, sizeof(int) * 4, IPC_CREAT | 0666);
     int* totalServiced = (int*) shmat(shmid, NULL, 0);
     int* numWaited = totalServiced + 1;
     int* numNotWaited = numWaited + 1;
+    int* clerksAvailVal = totalServiced + 3;
+    *clerksAvailVal = numOfClerks;
     shmctl(shmid, IPC_RMID, NULL);
 
     for (int i = 0; i < customers.size(); i++) {
         if (customers[i].timeLastArrival > 0) {
             sleep(customers[i].timeLastArrival);
         }
-        clerkSem = sem_open("clerks", O_CREAT);
+        clerksSem = sem_open("clerksSem", O_CREAT);
         if ((pid = fork()) == 0) {
             printf("%s arriving\n", customers[i].name.c_str());
             
             // Record service data
-            sem_wait(serviceDataSem);
-            if (sem_getvalue(clerkSem, &semValue)) {
-                perror("getval");
-                return 1;
-            }
+            sem_wait(serviceDataMutex);
             (*totalServiced)++;
-            if (semValue > 0) {
+            if (*clerksAvailVal > 0) {
                 (*numNotWaited)++;
             } else {
                 (*numWaited)++;
             }
-            //printf("semValue: %d\n", semValue);
-            sem_post(serviceDataSem);
+            //printf("semValue: %d\n", *clerksAvailVal);
+            sem_post(serviceDataMutex);
 
             // Serve customer
-            sem_wait(clerkSem);
+            sem_wait(clerksSem);
+            sem_wait(mutexSem);
+            (*clerksAvailVal)--;
             printf("%s getting helped\n", customers[i].name.c_str());
+            sem_post(mutexSem);
+
             if (customers[i].serviceTime > 0) {
                 sleep(customers[i].serviceTime);
             }
+
+            sem_wait(mutexSem);
+            (*clerksAvailVal)++;
             printf("%s leaving restaurant\n", customers[i].name.c_str());
-            sem_post(clerkSem);
+            sem_post(mutexSem);
+            sem_post(clerksSem);
             break;
         }
     }
@@ -102,10 +108,12 @@ int main(int argc, char* argv[]) {
 
         // Close semaphores and shared memory
         shmdt(totalServiced);
-        sem_unlink("clerks");
-        sem_close(clerkSem);
-        sem_unlink("serviceData");
-        sem_close(serviceDataSem);
+        sem_unlink("clerksSem");
+        sem_close(clerksSem);
+        sem_unlink("serviceDataMutex");
+        sem_close(serviceDataMutex);
+        sem_unlink("mutexSem");
+        sem_close(mutexSem);
     }
     return 0;
 }
