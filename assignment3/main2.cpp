@@ -41,8 +41,13 @@ vector<customer> getCustomers(string& filename) {
 }
 
 int main(int argc, char* argv[]) {
+    if (argc < 3) {
+        fprintf(stderr, "ERROR - usage: %s [number_of_clerks] [input_file]\n", argv[0]);
+        exit(1);
+    }
     int numOfClerks = atoi(argv[1]);
     std::string filename = argv[2];
+
     vector<customer> customers = getCustomers(filename); 
     sem_t *clerksSem = sem_open("clerksSem", O_CREAT, 0600, numOfClerks);
     sem_t *serviceDataMutex = sem_open("serviceDataMutex", O_CREAT, 0600, 1);
