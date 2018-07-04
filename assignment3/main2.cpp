@@ -63,13 +63,11 @@ int main(int argc, char* argv[]) {
     int* numNotWaited = numWaited + 1;
     int* clerksAvailVal = totalServiced + 3;
     *clerksAvailVal = numOfClerks;
-    shmctl(shmid, IPC_RMID, NULL);
 
     for (int i = 0; i < customers.size(); i++) {
         if (customers[i].timeLastArrival > 0) {
             sleep(customers[i].timeLastArrival);
         }
-        clerksSem = sem_open("clerksSem", O_CREAT);
         if ((pid = fork()) == 0) {
             printf("%s arriving\n", customers[i].name.c_str());
             
@@ -112,7 +110,11 @@ int main(int argc, char* argv[]) {
         printf("Number of customers required to wait: %d\n", *numWaited);
 
         // Close semaphores and shared memory
+        shmctl(shmid, IPC_RMID, NULL); // Delete shared memory segment after all processes detach
         shmdt(totalServiced);
+        shmdt(numWaited);
+        shmdt(numNotWaited);
+        shmdt(clerksAvailVal);
         sem_unlink("clerksSem");
         sem_close(clerksSem);
         sem_unlink("serviceDataMutex");
